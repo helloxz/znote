@@ -2,8 +2,13 @@
 /**
  * Vditor 编辑器核心组件
  *
- * 基于 Vditor 的 WYSIWYG Markdown 编辑器
+ * 基于 Vditor 的 Markdown 编辑器（即时渲染模式，类似 Typora）
  * 实现 v-model 兼容，支持外部值同步和输入监听
+ *
+ * 主题配置：
+ *   - 编辑器主题：classic（与 Znote 亮色界面协调）
+ *   - 内容主题：ant-design（默认）/ light / dark / wechat（用户可在工具栏切换）
+ *   - 代码主题：github（带行号）
  */
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import Vditor from "vditor";
@@ -32,18 +37,44 @@ let vditor: Vditor | null = null;
 
 /**
  * onMounted 阶段创建 Vditor 实例
- * 使用 DOM ref 作为挂载点，配置所见即所得模式
+ * 配置即时渲染模式 + Ant Design 内容主题 + Github 代码主题
  */
 onMounted(() => {
     if (!editorRef.value) return;
 
     vditor = new Vditor(editorRef.value, {
         height: "100%",
-        mode: "ir", // 即时渲染模式
+        mode: "ir",
+        theme: "classic",
+        lang: "zh_CN",
         placeholder: props.placeholder || "开始编写...",
         value: props.modelValue,
         toolbarConfig: { pin: true },
         cache: { enable: false },
+        counter: { enable: true, type: "text" },
+        outline: { enable: false, position: "left" },
+        typewriterMode: false,
+        preview: {
+            theme: {
+                current: "ant-design",
+                list: {
+                    "ant-design": "Ant Design",
+                    light: "Light",
+                    dark: "Dark",
+                    wechat: "WeChat",
+                },
+                path: "https://unpkg.com/vditor@3.11.2/dist/css/content-theme",
+            },
+            hljs: {
+                style: "github",
+                lineNumber: true,
+            },
+            markdown: {
+                // autoSpace: true,
+                fixTermTypo: true,
+                toc: true,
+            },
+        },
         input(value) {
             if (!isInternalUpdate) {
                 emit("update:modelValue", value);

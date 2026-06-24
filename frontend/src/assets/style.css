@@ -44,13 +44,9 @@
 }
 /* ============================================================
  * Vditor 编辑器样式覆盖
+ * 使 Vditor 与 Znote 亮色主题融合：白底、圆角、轻边框
  * ============================================================ */
-.editor-wrapper {
-  --vditor-bg: transparent;
-}
-
-.vditor-reset {
-  padding: 16px !important;
-  min-height: 100% !important;
-  outline: none !important;
+.editor-wrapper{
+    background-color: #fff !important;
+    border:0px !important;
 }
