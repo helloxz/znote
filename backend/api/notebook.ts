@@ -1,5 +1,5 @@
 import { Context } from "hono";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 
@@ -53,6 +53,29 @@ export const listNotebooks = async (c: Context) => {
     return c.json({
         code: 200,
         msg: "notebook.list.success",
+        data: notebooks,
+    });
+};
+
+/**
+ * 获取用户的顶层笔记本（parent_id 为 NULL，按 sort_order 排序）
+ */
+export const getTopLevelNotebooks = async (c: Context) => {
+    const uid = Number(c.get("uid"));
+
+    const notebooks = await db
+        .select()
+        .from(schema.notebooks)
+        .where(and(
+            eq(schema.notebooks.user_id, uid),
+            isNull(schema.notebooks.parent_id),
+        ))
+        .orderBy(schema.notebooks.sort_order)
+        .all();
+
+    return c.json({
+        code: 200,
+        msg: "notebook.top.success",
         data: notebooks,
     });
 };

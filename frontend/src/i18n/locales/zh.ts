@@ -100,6 +100,7 @@ export default {
     "panel.template.title": "业务模板占位页",
     "panel.template.description": "这里预留给后续项目放置业务模块入口、统计卡片、表格页、表单页或内容管理功能。",
     "notebook.list.success": "获取笔记本列表成功",
+    "notebook.top.success": "获取笔记本列表成功",
     "notebook.create.success": "创建成功",
     "notebook.create.title_required": "名称不能为空",
     "notebook.create.parent_not_found": "父分类不存在",

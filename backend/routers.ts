@@ -18,7 +18,7 @@ import {
     resetUserPassword,
     userInfo,
 } from "@/api/user";
-import { listNotebooks, createNotebook, updateNotebook } from "@/api/notebook";
+import { listNotebooks, getTopLevelNotebooks, createNotebook, updateNotebook } from "@/api/notebook";
 import { listNotes, createNote, updateNote, deleteNote } from "@/api/note";
 import { verifyApiToken } from "@/middleware/auth";
 import type { AppVariables } from "@/types";
@@ -72,6 +72,7 @@ userRouter.get("/get_user_setting", getUserSetting);
 userRouter.post("/set_user_setting", setUserSetting);
 
 userRouter.get("/notebook/list", listNotebooks);
+userRouter.get("/notebook/top", getTopLevelNotebooks);
 userRouter.post("/notebook/create", createNotebook);
 userRouter.post("/notebook/update", updateNotebook);
 

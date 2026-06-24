@@ -100,6 +100,7 @@ export default {
     "panel.template.title": "Templates Placeholder",
     "panel.template.description": "Reserved for business module entries, statistics cards, table pages, form pages, or content management features.",
     "notebook.list.success": "Notebook list loaded",
+    "notebook.top.success": "Notebook list loaded",
     "notebook.create.success": "Created successfully",
     "notebook.create.title_required": "Title is required",
     "notebook.create.parent_not_found": "Parent category not found",
