@@ -1,0 +1,1 @@
+import{a4 as s}from"./index.2026051601.js";import{r as a}from"./req-CJ5L5cLN.js";const i=s("system",{state:()=>({status:{app_name:"Zest",initialized:!1,allow_register:!0}}),actions:{async fetchStatus(){const t=await a.get("/api/system/status");return t.data?.code===200&&(this.status=t.data.data),this.status}}});export{i as u};

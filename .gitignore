@@ -1,0 +1,11 @@
+node_modules/
+dist/
+data/
+!data/.gitkeep
+!data/db/
+!data/db/.gitkeep
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+.env
+frontent/.env.development

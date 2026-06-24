@@ -1,0 +1,14 @@
+services:
+  zest:
+    container_name: zest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3080:3080"
+    volumes:
+      - "./data:/opt/zest/data"
+      - "./.env:/opt/zest/.env"
+    restart: always
+    environment:
+      TZ: Asia/Shanghai
