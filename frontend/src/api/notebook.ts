@@ -5,7 +5,7 @@
  * 所有方法在 token 失效时会由 axios 拦截器统一处理（业务侧只关心 code === 200）。
  */
 import req from "@/utils/req";
-import type { CreateNotebookPayload, Notebook } from "@/types/note";
+import type { CreateNotebookPayload, Notebook, SortNotebookItem } from "@/types/note";
 
 /** 统一接口返回结构 */
 interface ApiResult<T> {
@@ -59,6 +59,20 @@ export const updateNotebook = async (id: number, payload: { title?: string; desc
     const res = await req.post<ApiResult<Notebook>>("/api/user/notebook/update", { id, ...payload });
     if (res.data?.code === 200) {
         return res.data.data;
+    }
+    return null;
+};
+
+/**
+ * 批量排序分类（同级内拖动排序）
+ * 前端传全量 items，后端事务更新后返回该父节点下排序后的子分类列表
+ * @param items 分类 id 及对应排序值
+ * @returns 更新后的分类列表（失败返回 null）
+ */
+export const sortNotebooks = async (items: SortNotebookItem[]): Promise<Notebook[] | null> => {
+    const res = await req.post<ApiResult<Notebook[]>>("/api/user/notebook/sort", { items });
+    if (res.data?.code === 200) {
+        return res.data.data ?? [];
     }
     return null;
 };

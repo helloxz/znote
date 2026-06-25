@@ -10,7 +10,7 @@
 import { defineStore } from "pinia";
 import * as notebookApi from "@/api/notebook";
 import * as noteApi from "@/api/note";
-import type { CreateNotebookPayload, CreateNotePayload, Note, Notebook, NotebookNode, SortNoteItem } from "@/types/note";
+import type { CreateNotebookPayload, CreateNotePayload, Note, Notebook, NotebookNode, SortNoteItem, SortNotebookItem } from "@/types/note";
 
 interface LoadingState {
     tree: boolean;     // 笔记本树加载中
@@ -277,6 +277,30 @@ export const useNoteStore = defineStore("note", {
                     if (result.parent_id === null) {
                         this.topNotebooks = this.topNotebooks.map((nb) => (nb.id === id ? result : nb));
                     }
+                }
+                return result;
+            } finally {
+                this.loading.save = false;
+            }
+        },
+
+        /**
+         * 批量排序分类（同级内拖动排序）
+         * 前端传全量 items，后端事务更新后返回该父节点下排序后的子分类列表
+         * 用返回数据覆盖 allNotebooks 中对应记录的 sort_order
+         * categoryTree getter 会自动重算
+         * @param items 分类 id 及对应排序值
+         */
+        async sortNotebooks(items: SortNotebookItem[]) {
+            this.loading.save = true;
+            try {
+                const result = await notebookApi.sortNotebooks(items);
+                if (result) {
+                    // 用返回的排序后数据更新 allNotebooks 中对应记录
+                    const idToUpdate = new Map(result.map((n) => [n.id, n]));
+                    this.allNotebooks = this.allNotebooks.map((nb) =>
+                        idToUpdate.get(nb.id) ?? nb,
+                    );
                 }
                 return result;
             } finally {

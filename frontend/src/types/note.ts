@@ -65,3 +65,11 @@ export interface SortNoteItem {
     /** 排序值 */
     sort_order: number;
 }
+
+/** 批量排序分类的单项参数 */
+export interface SortNotebookItem {
+    /** 分类 ID */
+    id: number;
+    /** 排序值 */
+    sort_order: number;
+}

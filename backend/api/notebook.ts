@@ -231,3 +231,96 @@ export const updateNotebook = async (c: Context) => {
         data: result,
     });
 };
+
+/**
+ * 批量排序分类（同级内拖动排序）
+ * 前端传全量 items: [{id, sort_order}]
+ * 后端从首个分类推断 parent_id，事务批量更新，返回该父节点下排序后的子分类列表
+ */
+export const sortNotebooks = async (c: Context) => {
+    const uid = Number(c.get("uid"));
+    const payload = await c.req.json();
+
+    const { items } = payload || {};
+
+    // 校验 items 非空数组
+    if (!Array.isArray(items) || items.length === 0) {
+        return c.json({
+            code: -1000,
+            msg: "notebook.sort.items_required",
+            data: null,
+        });
+    }
+
+    // 校验每个 item 的 id 和 sort_order 合法
+    for (const item of items) {
+        if (
+            !item ||
+            typeof item.id !== "number" ||
+            typeof item.sort_order !== "number" ||
+            !Number.isFinite(item.sort_order)
+        ) {
+            return c.json({
+                code: -1000,
+                msg: "notebook.sort.items_invalid",
+                data: null,
+            });
+        }
+    }
+
+    // 从首个分类推断 parent_id，同时校验归属当前用户
+    const firstNode = await db
+        .select({ parent_id: schema.notebooks.parent_id })
+        .from(schema.notebooks)
+        .where(and(
+            eq(schema.notebooks.id, items[0].id),
+            eq(schema.notebooks.user_id, uid),
+        ))
+        .get();
+
+    if (!firstNode) {
+        return c.json({
+            code: -1000,
+            msg: "notebook.sort.notebook_not_found",
+            data: null,
+        });
+    }
+
+    const parentId = firstNode.parent_id;
+
+    // 事务内批量更新 sort_order（带 user_id 防越权）
+    const now = new Date();
+    await db.transaction(async (tx) => {
+        for (const item of items) {
+            await tx
+                .update(schema.notebooks)
+                .set({
+                    sort_order: item.sort_order,
+                    updated_at: now,
+                })
+                .where(and(
+                    eq(schema.notebooks.id, item.id),
+                    eq(schema.notebooks.user_id, uid),
+                ));
+        }
+    });
+
+    // 返回该父节点下排序后的子分类列表（排序口径与 listNotebooks 一致）
+    const notebooks = await db
+        .select()
+        .from(schema.notebooks)
+        .where(and(
+            eq(schema.notebooks.user_id, uid),
+            parentId === null
+                ? isNull(schema.notebooks.parent_id)
+                : eq(schema.notebooks.parent_id, parentId),
+        ))
+        .orderBy(schema.notebooks.sort_order)
+        .all();
+
+    return c.json({
+        code: 200,
+        msg: "notebook.sort.success",
+        data: notebooks,
+    });
+};

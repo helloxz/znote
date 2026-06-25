@@ -7,14 +7,19 @@
  *  - 点击：选中分类
  *  - hover 显示"+"：新建子分类
  *  - 展开/折叠：子节点显示隐藏
- *  - TODO: 拖拽排序（v2）
+ *  - 子节点之间支持同级拖拽排序
  */
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useMessage } from "naive-ui";
+import { VueDraggable } from "vue-draggable-plus";
 import ZIcon from "@/components/DynamicIcon.vue";
+import { useNoteStore } from "@/stores/note";
 import type { NotebookNode } from "@/types/note";
 
 const { t } = useI18n();
+const message = useMessage();
+const noteStore = useNoteStore();
 
 const props = defineProps<{
     node: NotebookNode;
@@ -60,6 +65,40 @@ const handleAddChild = (e: Event) => {
     e.stopPropagation();
     expanded.value = true;
     emit("requestDialog", props.node.id, props.node.title);
+};
+
+/**
+ * 本地子节点副本（可被 VueDraggable 直接 mutate）
+ * 通过 watch 与 props.node.children 保持同步，拖拽完成后用后端返回数据覆盖
+ */
+const localChildren = ref<NotebookNode[]>([]);
+
+watch(
+    () => props.node.children,
+    (newChildren) => {
+        localChildren.value = [...newChildren];
+    },
+    { immediate: true },
+);
+
+/**
+ * 子节点拖拽结束回调
+ * VueDraggable 已将新顺序写入 localChildren，据此构建 items 调用后端排序接口
+ * 用后端返回数据刷新 store，store 更新后 props 变化会再次同步 localChildren
+ */
+const onChildDragEnd = async () => {
+    const items = localChildren.value.map((n, idx) => ({
+        id: n.id,
+        sort_order: idx,
+    }));
+    const result = await noteStore.sortNotebooks(items);
+    if (result) {
+        message.success(t("notebook.sort.success"));
+    } else {
+        // 排序失败：回退本地顺序
+        localChildren.value = [...props.node.children];
+        message.error(t("notebook.sort.failed"));
+    }
 };
 </script>
 
@@ -110,10 +149,16 @@ const handleAddChild = (e: Event) => {
       </button>
     </div>
 
-    <!-- 递归渲染子节点（无嵌套滚动条，滚动由外层容器统一处理） -->
-    <div v-if="hasChildren() && expanded">
+    <!-- 递归渲染子节点，同层兄弟支持拖拽排序（无 group，天然隔离不跨层） -->
+    <VueDraggable
+      v-if="hasChildren() && expanded"
+      v-model="localChildren"
+      :animation="150"
+      :disabled="noteStore.loading.save"
+      @end="onChildDragEnd"
+    >
       <CategoryTreeNode
-        v-for="child in node.children"
+        v-for="child in localChildren"
         :key="child.id"
         :node="child"
         :active-id="activeId"
@@ -122,7 +167,7 @@ const handleAddChild = (e: Event) => {
         @request-dialog="(pid: number, pname: string) => emit('requestDialog', pid, pname)"
         @contextmenu="(n: NotebookNode, e: MouseEvent) => emit('contextmenu', n, e)"
       />
-    </div>
+    </VueDraggable>
   </div>
 </template>
 
