@@ -193,6 +193,7 @@ export default {
     "note.editor.placeholder": "Start writing...",
     "note.editor.save": "Save",
     "note.editor.saving": "Saving...",
+    "note.editor.saved": "Saved successfully",
     "note.editor.save_failed": "Save failed",
     "note.editor.unsaved": "Unsaved",
     "note.meta.created_at": "Created at",

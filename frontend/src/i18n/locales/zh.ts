@@ -193,6 +193,7 @@ export default {
     "note.editor.placeholder": "开始书写...",
     "note.editor.save": "保存",
     "note.editor.saving": "保存中...",
+    "note.editor.saved": "保存成功",
     "note.editor.save_failed": "保存失败",
     "note.editor.unsaved": "未保存",
     "note.meta.created_at": "创建于",
