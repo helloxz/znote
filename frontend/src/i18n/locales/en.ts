@@ -150,7 +150,7 @@ export default {
     "note.notebook.create.placeholder": "Enter notebook name",
     "note.notebook.empty": "No notebooks yet, click the button above to create one",
     "note.notebook.empty_short": "No notebooks",
-    "note.category.header": "My Notes",
+    "note.category.header": "Note Categories",
     "note.category.empty": "No categories in this notebook",
     "note.category.add_child": "New Subcategory",
     "note.category.create.title": "New Subcategory",

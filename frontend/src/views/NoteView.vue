@@ -477,7 +477,7 @@ const handleSaveTitle = async () => {
       </div>
 
       <!-- 分类区域标题栏：我的笔记 + 导入按钮 + 新建分类按钮 -->
-      <div class="flex items-center justify-between border-b border-slate-700/60 px-3 py-2">
+      <div class="flex items-center justify-between border-b border-slate-700/60 px-2 py-2">
         <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">
           {{ t("note.category.header") }}
         </span>
