@@ -125,3 +125,18 @@ export const fetchNoteVersion = async (versionId: number): Promise<NoteVersion |
     }
     return null;
 };
+
+/**
+ * 获取单条笔记详情（含 notebook_id，用于 deep-link / 第三栏独立渲染）
+ * @param id 笔记 ID
+ * @returns 完整笔记对象，失败返回 null
+ */
+export const fetchNoteById = async (id: number): Promise<Note | null> => {
+    const res = await req.get<ApiResult<Note>>("/api/user/note/detail", {
+        params: { id },
+    });
+    if (res.data?.code === 200) {
+        return res.data.data;
+    }
+    return null;
+};

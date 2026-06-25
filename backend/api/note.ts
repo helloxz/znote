@@ -393,3 +393,45 @@ export const sortNotes = async (c: Context) => {
         data: notes,
     });
 };
+
+/**
+ * 获取单条笔记详情（含 notebook_id，用于 deep-link / 单独展示）
+ * id 必传，校验归属当前用户
+ */
+export const getNoteById = async (c: Context) => {
+    const uid = Number(c.get("uid"));
+    const noteId = Number(c.req.query("id"));
+
+    // 校验 id
+    if (!noteId || isNaN(noteId)) {
+        return c.json({
+            code: -1000,
+            msg: "note.detail.id_required",
+            data: null,
+        });
+    }
+
+    // 校验笔记属于当前用户（user_id 条件防越权）
+    const note = await db
+        .select()
+        .from(schema.notes)
+        .where(and(
+            eq(schema.notes.id, noteId),
+            eq(schema.notes.user_id, uid),
+        ))
+        .get();
+
+    if (!note) {
+        return c.json({
+            code: -1000,
+            msg: "note.detail.not_found",
+            data: null,
+        });
+    }
+
+    return c.json({
+        code: 200,
+        msg: "note.detail.success",
+        data: note,
+    });
+};

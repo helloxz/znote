@@ -21,6 +21,8 @@ const props = defineProps<{
     saving?: boolean;
     /** 是否处于历史版本查看模式（控制【回到当前】按钮显隐） */
     viewingVersion?: boolean;
+    /** 移动端精简模式（隐藏时间和历史按钮，保存按钮改为纯图标） */
+    mobile?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -55,7 +57,7 @@ const updatedText = computed(() => formatTime(props.note.updated_at));
       </div>
 
       <!-- 创建时间 -->
-      <div class="flex items-center gap-1.5">
+      <div v-if="!mobile" class="flex items-center gap-1.5">
         <ZIcon name="ri:add-circle-line" :size="13" color="#94a3b8" />
         <span class="text-slate-400">{{ t("note.meta.created_at") }}：</span>
         <span class="text-slate-700">{{ createdText }}</span>
@@ -82,8 +84,9 @@ const updatedText = computed(() => formatTime(props.note.updated_at));
         <span>{{ t("note.version.back_to_current") }}</span>
       </button>
 
-      <!-- 历史版本按钮（次级样式，点击打开历史抽屉） -->
+      <!-- 历史版本按钮（移动端隐藏） -->
       <button
+        v-if="!mobile"
         class="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-blue-300 hover:text-blue-600"
         type="button"
         @click="emit('history')"
@@ -92,8 +95,9 @@ const updatedText = computed(() => formatTime(props.note.updated_at));
         <span>{{ t("note.version.button") }}</span>
       </button>
 
-      <!-- 保存按钮 -->
+      <!-- 保存按钮：移动端纯图标，桌面端带文字 -->
       <button
+        v-if="!mobile"
         class="flex items-center gap-1.5 rounded-md bg-blue-600 px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         :disabled="saving"
         @click="emit('save')"
@@ -101,6 +105,15 @@ const updatedText = computed(() => formatTime(props.note.updated_at));
         <ZIcon v-if="!saving" name="ri:save-line" :size="14" color="currentColor" />
         <ZIcon v-else name="ri:loader-4-line" :size="14" color="currentColor" class="animate-spin" />
         <span>{{ saving ? t("note.editor.saving") : t("note.editor.save") }}</span>
+      </button>
+      <button
+        v-else
+        class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-600 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="saving"
+        @click="emit('save')"
+      >
+        <ZIcon v-if="!saving" name="ri:save-line" :size="16" color="currentColor" />
+        <ZIcon v-else name="ri:loader-4-line" :size="16" color="currentColor" class="animate-spin" />
       </button>
     </div>
   </div>

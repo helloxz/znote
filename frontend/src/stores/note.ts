@@ -11,6 +11,7 @@
 import { defineStore } from "pinia";
 import * as notebookApi from "@/api/notebook";
 import * as noteApi from "@/api/note";
+import { fetchNoteById } from "@/api/note";
 import type { CreateNotebookPayload, CreateNotePayload, Note, Notebook, NotebookNode, SortNoteItem, SortNotebookItem } from "@/types/note";
 
 interface LoadingState {
@@ -18,6 +19,7 @@ interface LoadingState {
     notes: boolean;    // 笔记列表加载中
     save: boolean;     // 创建/更新操作中
     search: boolean;   // 全文搜索中
+    noteDetail: boolean; // 单条笔记详情加载中
 }
 
 /** sessionStorage 存储 key 常量 */
@@ -175,6 +177,24 @@ const removeNodeFromTree = (
         });
 };
 
+/**
+ * 在树中找到指定节点的顶层祖先 id（顶层笔记本）
+ * 从 root 遍历，若 targetId 属于某个 root 或其后代，返回该 root 的 id
+ */
+const findTopLevelAncestor = (tree: NotebookNode[], targetId: number): number | null => {
+    const contains = (node: NotebookNode, id: number): boolean => {
+        if (node.id === id) return true;
+        for (const child of node.children) {
+            if (contains(child, id)) return true;
+        }
+        return false;
+    };
+    for (const root of tree) {
+        if (contains(root, targetId)) return root.id;
+    }
+    return null;
+};
+
 export const useNoteStore = defineStore("note", {
     state: () => ({
         /** 笔记本树（后端返回的树形结构，顶层节点数组，子节点嵌在 children 里） */
@@ -189,6 +209,8 @@ export const useNoteStore = defineStore("note", {
         activeCategoryId: readSessionId(SESSION_KEYS.category),
         /** 当前选中的笔记 id（优先从 sessionStorage 恢复） */
         activeNoteId: readSessionId(SESSION_KEYS.note),
+        /** 单条笔记数据（优先于 noteMap 的缓存，由 selectNote / fetchNoteDetail 填充） */
+        activeNoteData: null as Note | null,
         /** 是否处于搜索态（第二栏显示搜索结果而非分类列表） */
         searchMode: false,
         /** 当前搜索关键词 */
@@ -201,6 +223,7 @@ export const useNoteStore = defineStore("note", {
             notes: false,
             save: false,
             search: false,
+            noteDetail: false,
         } as LoadingState,
     }),
 
@@ -240,11 +263,12 @@ export const useNoteStore = defineStore("note", {
         },
 
         /**
-         * 当前选中的笔记（O(1) 查找）
+         * 当前选中的笔记
+         * 优先从 activeNoteData（单独 API 拉取），未命中时 fallback noteMap（列表缓存）
          */
         activeNote(): Note | null {
             if (this.activeNoteId === null) return null;
-            return this.noteMap.get(this.activeNoteId) ?? null;
+            return this.activeNoteData ?? this.noteMap.get(this.activeNoteId) ?? null;
         },
 
         /**
@@ -381,11 +405,70 @@ export const useNoteStore = defineStore("note", {
         },
 
         /**
-         * 选中笔记，同步写入 sessionStorage
+         * 选中笔记，优先从缓存取，无缓存时调 API 获取
+         * 同步写入 sessionStorage
          */
-        selectNote(id: number | null) {
+        async selectNote(id: number | null) {
             this.activeNoteId = id;
             writeSessionId(SESSION_KEYS.note, id);
+
+            if (id === null) {
+                this.activeNoteData = null;
+                return;
+            }
+
+            // 优先从 noteMap 缓存取
+            const cached = this.noteMap.get(id);
+            if (cached) {
+                this.activeNoteData = cached;
+                this.loading.noteDetail = false;
+                return;
+            }
+
+            // 缓存未命中，调 API 获取
+            this.loading.noteDetail = true;
+            try {
+                const note = await fetchNoteById(id);
+                // 防止竞态：API 返回时 activeNoteId 可能已改变，仅匹配时才写入
+                if (this.activeNoteId === id) {
+                    this.activeNoteData = note;
+                }
+            } finally {
+                if (this.activeNoteId === id) {
+                    this.loading.noteDetail = false;
+                }
+            }
+        },
+
+        /**
+         * Deep-link 用：根据笔记 ID 自动定位到所属分类并选中笔记
+         * 1. 调 API 取笔记详情以获取 notebook_id
+         * 2. 在 notebookTree 中找到该分类的顶层笔记本
+         * 3. 切换笔记本 → 选中分类 → 加载分类笔记 → 选中笔记
+         * @param noteId 笔记 ID
+         */
+        async locateAndSelectNote(noteId: number) {
+            // 1. 获取笔记详情（取 notebook_id）
+            const note = await fetchNoteById(noteId);
+            if (!note) return;
+
+            // 2. 在笔记本树中找到该分类的顶层笔记本
+            const topLevelId = findTopLevelAncestor(this.notebookTree, note.notebook_id);
+            if (topLevelId === null) return;
+
+            // 3. 切换到顶层笔记本（会重置 activeCategoryId / activeNoteId）
+            this.activeNotebookId = topLevelId;
+            writeSessionId(SESSION_KEYS.notebook, topLevelId);
+
+            // 4. 选中笔记所属分类（按需加载该分类的笔记列表）
+            this.activeCategoryId = note.notebook_id;
+            writeSessionId(SESSION_KEYS.category, note.notebook_id);
+            if (!this.loadedCategoryIds.has(note.notebook_id)) {
+                await this.loadCategoryNotes(note.notebook_id);
+            }
+
+            // 5. 选中笔记（缓存已有，走 selectNote 的缓存分支秒出）
+            await this.selectNote(noteId);
         },
 
         /**
@@ -598,6 +681,10 @@ export const useNoteStore = defineStore("note", {
                                 i === sidx ? result : n,
                             );
                         }
+                    }
+                    // 若更新的是当前激活笔记，同步刷新 activeNoteData
+                    if (this.activeNoteId === id) {
+                        this.activeNoteData = result;
                     }
                 }
                 return result;

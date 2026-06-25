@@ -40,6 +40,41 @@ const message = useMessage();
 const noteStore = useNoteStore();
 const userStore = useUserStore();
 
+// ==================== 移动端检测 ====================
+
+/** 是否为移动端视口（≤768px） */
+const isMobile = ref(false);
+const mediaQuery = window.matchMedia?.("(max-width: 768px)");
+if (mediaQuery) {
+    isMobile.value = mediaQuery.matches;
+    const onMediaChange = (e: MediaQueryListEvent) => { isMobile.value = e.matches; };
+    mediaQuery.addEventListener("change", onMediaChange);
+    onBeforeUnmount(() => mediaQuery.removeEventListener("change", onMediaChange));
+}
+
+/** 移动端侧边栏抽屉开关 */
+const drawerOpen = ref(false);
+
+// ==================== 路由同步 ====================
+
+/**
+ * 监听路由 noteId 参数，同步到 store（浏览器前进/后退）
+ * 不使用 immediate，首屏由 onMounted 的 deep-link 逻辑统一处理
+ */
+watch(
+    () => route.params.noteId,
+    (noteId) => {
+        if (noteId) {
+            const numId = Number(noteId);
+            if (Number.isFinite(numId) && numId !== noteStore.activeNoteId) {
+                noteStore.selectNote(numId);
+            }
+        } else {
+            noteStore.selectNote(null);
+        }
+    },
+);
+
 // ==================== 弹窗控制 ====================
 
 /** 新建笔记本 Dialog 显隐 */
@@ -243,8 +278,11 @@ const activeCategoryName = computed(() => {
     return cat?.title ?? "-";
 });
 
-/** 是否有选中的笔记（用于第三栏内容切换） */
-const hasActiveNote = computed(() => noteStore.activeNoteId !== null && noteStore.activeNote !== null);
+/** 是否有选中的笔记（用于第三栏 / 移动端编辑器切换；仅检查 activeNoteId，加载中的 editor 区展示 loading） */
+const hasActiveNote = computed(() => noteStore.activeNoteId !== null);
+
+/** 笔记详情是否加载中 */
+const noteDetailLoading = computed(() => noteStore.loading.noteDetail);
 
 // ==================== 数据加载 ====================
 
@@ -267,6 +305,11 @@ onMounted(async () => {
 
     await userStore.getUserInfo();
     await noteStore.loadNotebookTree();
+
+    // Deep-link：URL 带有 noteId 但笔记不在缓存中时，自动定位到所属分类并加载
+    if (route.params.noteId && !noteStore.activeNote) {
+        await noteStore.locateAndSelectNote(Number(route.params.noteId));
+    }
 
     // 注册全局快捷键：Ctrl+S / Cmd+S 保存
     window.addEventListener("keydown", handleSaveShortcut);
@@ -292,10 +335,11 @@ const handleNavigate = (path: string) => {
     void router.push(path);
 };
 
-/** 切换顶层笔记本 */
+/** 切换顶层笔记本（移动端同步关闭抽屉） */
 const handleSwitchNotebook = (id: number | null) => {
     if (id !== null) {
         noteStore.switchNotebook(id);
+        if (isMobile.value) drawerOpen.value = false;
     }
 };
 
@@ -316,9 +360,10 @@ const handleConfirmCreateNotebook = async (title: string) => {
     }
 };
 
-/** 选中分类 */
+/** 选中分类（移动端同步关闭抽屉） */
 const handleSelectCategory = async (id: number) => {
     await noteStore.selectCategory(id);
+    if (isMobile.value) drawerOpen.value = false;
 };
 
 /** 打开"新建子分类"Dialog（用 Dialog 方式，由"我的笔记"标题栏触发） */
@@ -435,19 +480,25 @@ const handleOpenCreateNote = async () => {
     }
 };
 
-/** 选中笔记 */
-const handleSelectNote = (id: number) => {
-    noteStore.selectNote(id);
+/** 选中笔记（同时更新 URL；await 等待 selectNote 内部数据就绪后再路由） */
+const handleSelectNote = async (id: number) => {
+    await noteStore.selectNote(id);
+    router.push(`/note/${id}`);
+};
+
+/** 移动端返回笔记列表 */
+const handleMobileBack = () => {
+    drawerOpen.value = false;
+    router.back();
 };
 
 /**
  * 同步草稿状态
- * 切换笔记时，从 noteStore.activeNote 读取最新值写入草稿
+ * 监听 activeNote 而非 activeNoteId，避免 selectNote async 期间提前 flush 空白数据
  */
 watch(
-    () => noteStore.activeNoteId,
-    () => {
-        const note = noteStore.activeNote;
+    () => noteStore.activeNote,
+    (note) => {
         draftTitle.value = note?.title ?? "";
         draftContent.value = note?.content ?? "";
     },
@@ -517,7 +568,8 @@ const handleSaveTitle = async () => {
 </script>
 
 <template>
-  <div class="flex h-screen w-screen overflow-hidden bg-[#f7f8fa]">
+  <!-- ==================== 桌面端：三栏布局 ==================== -->
+  <div v-if="!isMobile" class="flex h-screen w-screen overflow-hidden bg-[#f7f8fa]">
     <!-- ==================== 第一栏：导航 ==================== -->
     <aside
       :style="{ width: col1Width + 'px' }"
@@ -601,7 +653,7 @@ const handleSaveTitle = async () => {
     <!-- ==================== 第三栏：编辑器 ==================== -->
     <main class="flex flex-1 flex-col overflow-hidden bg-white">
       <!-- 选中笔记时：编辑器 -->
-      <template v-if="hasActiveNote && noteStore.activeNote">
+      <template v-if="noteStore.activeNote">
         <!-- 顶部：可编辑标题 + 元信息 -->
         <div class="shrink-0 bg-white px-8 py-4">
           <input
@@ -646,6 +698,11 @@ const handleSaveTitle = async () => {
           />
         </div>
       </template>
+
+      <!-- 笔记加载中 -->
+      <div v-else-if="hasActiveNote && noteDetailLoading" class="flex flex-1 items-center justify-center bg-white">
+        <NSpin size="medium" />
+      </div>
 
       <!-- 未选中时：空态 -->
       <div v-else class="flex flex-1 items-center justify-center bg-white">
@@ -732,6 +789,231 @@ const handleSaveTitle = async () => {
     />
 
     <!-- 历史版本抽屉 -->
+    <VersionHistoryDialog
+      v-model:show="showVersionHistory"
+      :note-id="noteStore.activeNoteId"
+      @view="handleViewVersion"
+    />
+  </div>
+
+  <!-- ==================== 移动端：单栏切换布局 ==================== -->
+  <div v-else class="flex h-screen w-screen flex-col overflow-hidden bg-white">
+    <!-- 顶部导航栏 -->
+    <div class="flex shrink-0 items-center gap-2 border-b border-slate-200/60 px-3 py-2">
+      <button
+        v-if="!hasActiveNote"
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded text-slate-600 transition hover:bg-slate-100"
+        :title="t('note.mobile.menu')"
+        @click="drawerOpen = !drawerOpen"
+      >
+        <ZIcon name="ri:menu-line" :size="20" color="currentColor" />
+      </button>
+      <button
+        v-else
+        class="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-sm text-blue-600 transition hover:bg-blue-50"
+        @click="handleMobileBack"
+      >
+        <ZIcon name="ri:arrow-left-line" :size="18" color="currentColor" />
+        <span>{{ t("note.mobile.back") }}</span>
+      </button>
+      <span class="truncate text-sm font-medium text-slate-700">ZNote</span>
+    </div>
+
+    <!-- 侧边栏抽屉（Teleport 到 body 避免层叠上下文问题） -->
+    <Teleport to="body">
+      <div
+        v-show="drawerOpen"
+        class="fixed inset-0 z-50"
+        @click.self="drawerOpen = false"
+      >
+        <div class="absolute inset-0 bg-black/40" @click="drawerOpen = false" />
+        <div class="absolute left-0 top-0 bottom-0 flex w-72 flex-col bg-slate-800 text-slate-200 shadow-2xl">
+          <div class="flex items-center justify-between border-b border-slate-700/60 px-3 py-3">
+            <span class="text-sm font-medium">ZNote</span>
+            <button
+              class="rounded p-1 text-slate-400 transition hover:bg-slate-700/50 hover:text-slate-200"
+              @click="drawerOpen = false"
+            >
+              <ZIcon name="ri:close-line" :size="18" color="currentColor" />
+            </button>
+          </div>
+          <div class="border-b border-slate-700/60 p-3">
+            <UserHeader @navigate="(path: string) => { drawerOpen = false; handleNavigate(path); }" />
+          </div>
+          <div class="border-b border-slate-700/60 px-2 py-3">
+            <NotebookSwitcher
+              :notebooks="noteStore.notebookTree"
+              :model-value="noteStore.activeNotebookId"
+              @update:model-value="handleSwitchNotebook"
+              @create="handleOpenCreateNotebook"
+            />
+          </div>
+          <div class="flex items-center justify-between border-b border-slate-700/60 px-2 py-2">
+            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">
+              {{ t("note.category.header") }}
+            </span>
+            <div class="flex items-center gap-1">
+              <button
+                class="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition hover:bg-slate-700/60 hover:text-blue-300 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="noteStore.activeNotebookId === null"
+                :title="t('import.title')"
+                @click="showImportDialog = true"
+              >
+                <ZIcon name="ri:upload-line" :size="14" color="currentColor" />
+              </button>
+              <button
+                class="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition hover:bg-slate-700/60 hover:text-blue-300 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="noteStore.activeNotebookId === null"
+                :title="t('note.category.add_child')"
+                @click="handleAddTopCategory"
+              >
+                <ZIcon name="ri:add-line" :size="14" color="currentColor" />
+              </button>
+            </div>
+          </div>
+          <div class="flex-1 overflow-y-auto p-2">
+            <NSpin v-if="noteStore.loading.tree" class="block py-6" />
+            <CategoryTree
+              v-else
+              :tree="currentCategoryTree"
+              :active-id="noteStore.activeCategoryId"
+              @select="handleSelectCategory"
+              @request-dialog="(pid: number, pname: string) => openCreateCategoryDialog(pid, pname)"
+              @contextmenu="handleCategoryContextMenu"
+            />
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 笔记列表视图（无选中笔记时） -->
+    <div v-if="!hasActiveNote" class="flex flex-1 flex-col overflow-hidden">
+      <NoteList
+        :notes="noteStore.displayedNotes"
+        :active-id="noteStore.activeNoteId"
+        :loading="noteStore.loading.notes"
+        :disabled-create="noteStore.activeCategoryId === null"
+        @select="handleSelectNote"
+        @create="handleOpenCreateNote"
+      />
+    </div>
+
+    <!-- 编辑器视图（有选中笔记时） -->
+    <main v-else class="flex flex-1 flex-col overflow-hidden bg-white">
+      <template v-if="noteStore.activeNote">
+        <div class="shrink-0 bg-white px-4 py-3">
+          <input
+            ref="titleInputRef"
+            v-model="draftTitle"
+            :placeholder="t('note.editor.placeholder')"
+            type="text"
+            class="note-title-input"
+            @blur="handleSaveTitle"
+            @keydown.enter="($event.target as HTMLElement).blur()"
+          />
+          <div class="mt-2">
+            <NoteMetaBar
+              :note="noteStore.activeNote"
+              :category-name="activeCategoryName"
+              :saving="isSaving"
+              :viewing-version="viewingVersion"
+              :mobile="true"
+              @save="handleSaveNote"
+              @history="showVersionHistory = true"
+              @back-to-current="handleBackToCurrent"
+            />
+          </div>
+          <NAlert
+            v-if="viewingVersion"
+            type="warning"
+            show-icon
+            class="mt-2"
+            :show-arrow="false"
+          >
+            {{ t("note.version.viewing_warning", { version: viewingVersionNo }) }}
+          </NAlert>
+        </div>
+        <div class="flex-1 overflow-hidden bg-white px-4 pb-4 pt-0">
+          <NoteEditor
+            :model-value="draftContent"
+            height="100%"
+            @update:model-value="handleEditorChange"
+          />
+        </div>
+      </template>
+      <!-- 笔记加载中 -->
+      <div v-else-if="hasActiveNote && noteDetailLoading" class="flex flex-1 items-center justify-center bg-white">
+        <NSpin size="medium" />
+      </div>
+      <div v-else class="flex flex-1 items-center justify-center bg-white">
+        <div class="flex flex-col items-center gap-3 text-center">
+          <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
+            <ZIcon name="ri:notebook-2-line" :size="32" color="#94a3b8" />
+          </div>
+          <div>
+            <p class="text-base font-medium text-slate-700">{{ t("note.empty.workspace.title") }}</p>
+            <p class="mt-1 text-sm text-slate-400">{{ t("note.empty.workspace.desc") }}</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ==================== Dialogs ==================== -->
+    <CategoryContextMenu
+      v-model:show="categoryMenuShow"
+      :x="categoryMenuX"
+      :y="categoryMenuY"
+      :node="categoryMenuNode"
+      @select="handleCategoryMenuSelect"
+    />
+    <NModal
+      v-model:show="showRenameDialog"
+      preset="dialog"
+      :title="t('note.category.rename.title')"
+      :positive-text="t('note.dialog.confirm')"
+      :negative-text="t('note.dialog.cancel')"
+      :mask-closable="false"
+      @positive-click="handleConfirmRename"
+      @negative-click="showRenameDialog = false"
+    >
+      <NInput
+        v-model:value="renameValue"
+        :placeholder="t('note.category.rename.placeholder')"
+        autofocus
+        @keydown.enter="handleConfirmRename"
+      />
+    </NModal>
+    <DeleteNotebookDialog
+      v-model:show="showDeleteDialog"
+      :node="deleteTarget"
+      @confirm="handleConfirmDelete"
+    />
+    <MoveDialog
+      v-model:show="showMoveDialog"
+      :type="moveDialogType"
+      :source-id="moveSourceId"
+      :source-name="moveSourceName"
+      :notebook-tree="currentCategoryTree"
+      :exclude-node-ids="moveExcludeIds"
+      :current-category-id="moveCurrentCategoryId ?? undefined"
+      @confirm="handleMoveConfirm"
+      @cancel="handleMoveCancel"
+    />
+    <CreateNotebookDialog
+      v-model:show="showCreateNotebook"
+      :parent-id="null"
+      @confirm="handleConfirmCreateNotebook"
+    />
+    <CreateNotebookDialog
+      v-model:show="showCreateCategory"
+      :parent-id="newCategoryParent?.id ?? null"
+      :parent-name="newCategoryParent?.name"
+      @confirm="handleConfirmCreateCategory"
+    />
+    <ImportDialog
+      v-model:show="showImportDialog"
+      :notebook-id="noteStore.activeNotebookId"
+    />
     <VersionHistoryDialog
       v-model:show="showVersionHistory"
       :note-id="noteStore.activeNoteId"
