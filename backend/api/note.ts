@@ -395,6 +395,31 @@ export const sortNotes = async (c: Context) => {
 };
 
 /**
+ * 获取回收站笔记列表
+ * 查询当前用户已软删除的笔记，按删除时间倒序，最多 200 条
+ */
+export const listTrashNotes = async (c: Context) => {
+    const uid = Number(c.get("uid"));
+
+    const notes = await db
+        .select()
+        .from(schema.notes)
+        .where(and(
+            eq(schema.notes.user_id, uid),
+            eq(schema.notes.is_deleted, 1),
+        ))
+        .orderBy(desc(schema.notes.deleted_at))
+        .limit(200)
+        .all();
+
+    return c.json({
+        code: 200,
+        msg: "note.trash.list.success",
+        data: notes,
+    });
+};
+
+/**
  * 获取单条笔记详情（含 notebook_id，用于 deep-link / 单独展示）
  * id 必传，校验归属当前用户
  */
