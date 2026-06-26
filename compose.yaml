@@ -1,14 +1,11 @@
 services:
-  zest:
-    container_name: znode
-    build:
-      context: .
-      dockerfile: Dockerfile
+  znote:
+    container_name: znote
+    image: helloz/znote:0.1.0
     ports:
-      - "3080:3080"
+      - "3888:3888"
     volumes:
-      - "./data:/opt/zest/data"
-      - "./.env:/opt/zest/.env"
+      - "./data:/app/data"
     restart: always
     environment:
       TZ: Asia/Shanghai
