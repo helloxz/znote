@@ -734,7 +734,7 @@ const handleSaveTitle = async () => {
       <div v-else class="flex flex-1 items-center justify-center bg-white">
         <div class="flex flex-col items-center gap-3 text-center">
           <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
-            <ZIcon name="ri:notebook-2-line" :size="32" color="#94a3b8" />
+            <ZIcon name="ri:booklet-line" :size="32" color="#94a3b8" />
           </div>
           <div>
             <p class="text-base font-medium text-slate-700">{{ t("note.empty.workspace.title") }}</p>
@@ -997,7 +997,7 @@ const handleSaveTitle = async () => {
       <div v-else class="flex flex-1 items-center justify-center bg-white">
         <div class="flex flex-col items-center gap-3 text-center">
           <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
-            <ZIcon name="ri:notebook-2-line" :size="32" color="#94a3b8" />
+            <ZIcon name="ri:booklet-line" :size="32" color="#94a3b8" />
           </div>
           <div>
             <p class="text-base font-medium text-slate-700">{{ t("note.empty.workspace.title") }}</p>

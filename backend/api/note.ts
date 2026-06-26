@@ -186,7 +186,12 @@ export const updateNote = async (c: Context) => {
     const updates: Record<string, any> = { updated_at: new Date() };
     if (title !== undefined) updates.title = title.trim();
     if (content !== undefined) updates.content = content;
-    if (notebook_id !== undefined) updates.notebook_id = notebook_id;
+    if (notebook_id !== undefined) {
+        updates.notebook_id = notebook_id;
+        // 移动笔记到新分类时，自动恢复已删除的笔记（清空软删除标记）
+        updates.is_deleted = 0;
+        updates.deleted_at = null;
+    }
     if (is_pinned !== undefined) updates.is_pinned = is_pinned;
     if (sort_order !== undefined) updates.sort_order = sort_order;
 

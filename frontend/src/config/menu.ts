@@ -2,7 +2,7 @@ export const menuConfig = [
     {
         id: "notes",
         titleKey: "menu.notes",
-        icon: "ri:notebook-2-line",
+        icon: "ri:booklet-line",
         route: "/note",
     },
     {
