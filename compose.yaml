@@ -1,6 +1,6 @@
 services:
   zest:
-    container_name: zest
+    container_name: znode
     build:
       context: .
       dockerfile: Dockerfile

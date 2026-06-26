@@ -1,5 +1,5 @@
 {
-  "name": "zest",
+  "name": "znode",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,11 +14,11 @@
     "@libsql/client": "^0.17.4",
     "adm-zip": "^0.5.17",
     "drizzle-kit": "^0.31.10",
-    "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.9",
-    "zod": "^4.3.6"
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
-    "@types/bun": "^1.3.11"
+    "@types/bun": "^1.3.11",
+    "hono": "^4.12.9",
+    "zod": "^4.3.6"
   }
 }

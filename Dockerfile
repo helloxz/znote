@@ -1,27 +1,13 @@
-FROM oven/bun:1 AS builder
-
-WORKDIR /opt/zest
-
-COPY package.json tsconfig.json drizzle.config.ts build_frontend.sh ./
-COPY backend ./backend
-COPY frontend/package.json frontend/index.html frontend/env.d.ts frontend/vite.config.ts frontend/tsconfig.json frontend/tsconfig.app.json frontend/tsconfig.node.json ./frontend/
-COPY frontend/src ./frontend/src
-
-RUN bun install
-RUN cd frontend && bun install
-RUN sh build_frontend.sh
-
-FROM oven/bun:1-slim
-
-WORKDIR /opt/zest
-
-COPY package.json tsconfig.json drizzle.config.ts run.sh build_frontend.sh ./
-COPY backend ./backend
-COPY --from=builder /opt/zest/node_modules ./node_modules
-COPY --from=builder /opt/zest/dist ./dist
-COPY --from=builder /opt/zest/public ./public
-
-VOLUME /opt/zest/data
-EXPOSE 3080
-
+FROM oven/bun:1.3.14-slim
+# 创建工作目录为/opt/zmark
+WORKDIR /app
+# 合并所有 COPY 操作
+COPY . ./
+# 3. 安装依赖
+RUN bun install --production
+# 暴露挂载路径为
+VOLUME /app/data
+# 暴露暴露端口为3080
+EXPOSE 3888
+# 启动命令为sh run.sh
 CMD ["sh", "run.sh"]
