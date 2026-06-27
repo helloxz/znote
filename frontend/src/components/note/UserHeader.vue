@@ -4,17 +4,21 @@
  *
  * 功能：
  * 1. 展示头像和昵称（无头像回退为首字母）
- * 2. 下拉菜单：修改密码（禁用占位）、返回后台（仅管理员）、退出登录
+ * 2. 下拉菜单：修改密码、返回后台（仅管理员）、退出登录
  * 3. 通过事件与父组件通信，路由跳转由 NoteView 统一处理
  */
-import { computed, h } from "vue";
+import { computed, h, ref } from "vue";
 import { NDropdown } from "naive-ui";
 import { useI18n } from "vue-i18n";
 import { useUserStore } from "@/stores/user";
 import ZIcon from "@/components/DynamicIcon.vue";
+import ChangePasswordDialog from "@/components/note/dialogs/ChangePasswordDialog.vue";
 
 const { t } = useI18n();
 const userStore = useUserStore();
+
+/** 修改密码弹窗显隐 */
+const showChangePassword = ref(false);
 
 const emit = defineEmits<{
     (e: "navigate", path: string): void;
@@ -36,7 +40,6 @@ const userMenuOptions = computed(() => {
             label: t("note.user.change_password"),
             key: "change_password",
             icon: () => h(ZIcon, { name: "ri:lock-password-line", size: 16 }),
-            disabled: true,
         },
     ];
 
@@ -63,6 +66,10 @@ const userMenuOptions = computed(() => {
 
 /** 处理下拉菜单选择 */
 const handleMenuSelect = (key: string) => {
+    if (key === "change_password") {
+        showChangePassword.value = true;
+        return;
+    }
     if (key === "dashboard") {
         emit("navigate", "/dashboard/home");
         return;
@@ -93,5 +100,8 @@ const handleMenuSelect = (key: string) => {
         {{ userStore.userInfo.email || "" }}
       </div>
     </div>
+
+    <!-- 修改密码弹窗 -->
+    <ChangePasswordDialog v-model:show="showChangePassword" />
   </div>
 </template>

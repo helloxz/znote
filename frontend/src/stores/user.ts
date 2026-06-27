@@ -13,8 +13,18 @@ export const useUserStore = defineStore("user", {
     }),
     actions: {
         async clearLoginState(redirectTo = "/user/login") {
+            // 清除 localStorage
             localStorage.removeItem("token");
+            localStorage.removeItem("note-active-notebook-id");
+            localStorage.removeItem("note-col1-width");
+            localStorage.removeItem("note-col2-width");
+
+            // 清除 sessionStorage
             sessionStorage.removeItem("userInfo");
+            sessionStorage.removeItem("note-active-category-id");
+            sessionStorage.removeItem("note-active-note-id");
+            sessionStorage.removeItem("note:expandedCategories:1");
+
             this.userInfo = {
                 username: "",
                 email: "",

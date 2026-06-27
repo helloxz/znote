@@ -274,6 +274,12 @@ export const changePassword = async (c: Context) => {
         .where(eq(schema.users.id, uid))
         .run();
 
+    // 密码修改成功后，清除该用户的所有 session，强制所有设备重新登录
+    await db.update(schema.sessions)
+        .set({ status: "revoked" })
+        .where(and(eq(schema.sessions.uid, uid), eq(schema.sessions.status, "active")))
+        .run();
+
     return c.json({ code: 200, msg: "user.password.update.success", data: null });
 };
 

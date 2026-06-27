@@ -10,7 +10,6 @@ import DocsPanel from "@/components/dashboard/DocsPanel.vue";
 import UsersPanel from "@/components/dashboard/UsersPanel.vue";
 import TemplatePanel from "@/components/dashboard/TemplatePanel.vue";
 import SystemPanel from "@/components/dashboard/SystemPanel.vue";
-import ProfilePanel from "@/components/dashboard/ProfilePanel.vue";
 import { useUserStore } from "@/stores/user";
 import { useSiteStore } from "@/stores/site";
 
@@ -30,14 +29,12 @@ const componentMap: Record<string, any> = {
     users: UsersPanel,
     templates: TemplatePanel,
     settings: SystemPanel,
-    profile: ProfilePanel,
 };
 
 const appName = computed(() => siteStore.appInfo.app_name || "ZNote");
 
 const userMenuOptions = computed(() => [
     { label: t("dashboard.user_menu.home"), key: "home", icon: () => h(ZIcon, { name: "ri:home-line", size: 16 }) },
-    { label: t("dashboard.user_menu.profile"), key: "profile", icon: () => h(ZIcon, { name: "ri:user-settings-line", size: 16 }) },
     { label: t("dashboard.user_menu.logout"), key: "logout", icon: () => h(ZIcon, { name: "ri:logout-box-line", size: 16 }) },
 ]);
 
@@ -56,10 +53,6 @@ const loadRouteComponent = (name?: string | string[]) => {
 const handleUserMenuSelect = (key: string) => {
     if (key === "home") {
         router.push("/");
-        return;
-    }
-    if (key === "profile") {
-        router.push("/dashboard/profile");
         return;
     }
     if (key === "logout") {

@@ -29,10 +29,4 @@ export const menuConfig = [
         icon: "ri:settings-3-line",
         route: "/dashboard/settings",
     },
-    {
-        id: "profile",
-        titleKey: "dashboard.profile",
-        icon: "ri:user-settings-line",
-        route: "/dashboard/profile",
-    },
 ];
