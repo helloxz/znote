@@ -7,6 +7,7 @@
 import { ref, watch, nextTick, onMounted, inject, type Ref } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { NTooltip, useMessage } from "naive-ui";
 import { IncremarkContent, ThemeProvider } from "@incremark/vue";
 import type { DesignTokens } from "@incremark/theme";
 import "@incremark/theme/styles.css";
@@ -28,6 +29,7 @@ const codeTheme = {
 
 const route = useRoute();
 const { t } = useI18n();
+const message = useMessage();
 
 /** 注入 slug */
 const slug = inject<string>("slug", "");
@@ -130,6 +132,18 @@ const handleContentClick = (e: MouseEvent) => {
         previewSrc.value = (target as HTMLImageElement).src;
     }
 };
+
+/** 复制 Markdown 到剪贴板：标题使用一级 ATX 标题格式 */
+const copyMarkdown = async () => {
+    if (!note.value) return;
+    const md = `# ${note.value.title}\n\n${note.value.content}`;
+    try {
+        await navigator.clipboard.writeText(md);
+        message.success(t("doc.note.copy_success"));
+    } catch {
+        message.error(t("doc.note.copy_fail"));
+    }
+};
 </script>
 
 <template>
@@ -153,12 +167,25 @@ const handleContentClick = (e: MouseEvent) => {
       <!-- 笔记标题 + 元信息：底部细线分隔 -->
       <div class="mb-6 border-b border-slate-100 pb-4">
         <h1 class="mb-1.5 text-[1.75rem] font-bold tracking-tight text-slate-900">{{ note.title }}</h1>
-        <!-- 元信息 -->
-        <div class="flex items-center gap-3 text-xs text-slate-400">
-          <span v-if="note.updated_at" class="inline-flex items-center gap-1">
-            <ZIcon name="ri:time-line" :size="12" class="opacity-70" />
-            {{ t("doc.note.updated_at") }}: {{ formatDate(note.updated_at) }}
-          </span>
+        <!-- 元信息 + 复制按钮 -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3 text-xs text-slate-400">
+            <span v-if="note.updated_at" class="inline-flex items-center gap-1">
+              <ZIcon name="ri:time-line" :size="12" class="opacity-70" />
+              {{ t("doc.note.updated_at") }}: {{ formatDate(note.updated_at) }}
+            </span>
+          </div>
+          <NTooltip placement="top" trigger="hover">
+            <template #trigger>
+              <button
+                class="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                @click="copyMarkdown"
+              >
+                <ZIcon name="ri:file-copy-line" :size="14" />
+              </button>
+            </template>
+            {{ t("doc.note.copy_markdown") }}
+          </NTooltip>
         </div>
       </div>
 
