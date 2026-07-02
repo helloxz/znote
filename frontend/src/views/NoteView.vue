@@ -1000,7 +1000,7 @@ const handleSaveTitle = async () => {
         </div>
 
         <!-- 编辑器主体 -->
-        <div class="flex-1 overflow-hidden bg-white px-8 pb-6 pt-0">
+        <div class="flex-1 bg-white px-8 pb-6 pt-0" style="min-height:0">
           <NoteEditor
             ref="editorRef"
             :model-value="draftContent"
@@ -1322,7 +1322,7 @@ const handleSaveTitle = async () => {
             {{ t("note.version.viewing_warning", { version: viewingVersionNo }) }}
           </NAlert>
         </div>
-        <div class="flex-1 overflow-hidden bg-white px-4 pb-4 pt-0">
+        <div class="flex-1 bg-white px-4 pb-4 pt-0" style="min-height:0">
           <NoteEditor
             ref="editorRef"
             :model-value="draftContent"
