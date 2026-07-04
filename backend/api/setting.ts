@@ -84,6 +84,20 @@ const DEFAULT_SETTINGS: Record<string, Record<string, any>> = {
         description: "",
         custom_header: "",
     },
+    // AI向量模型设置
+    ai_embedding_setting: {
+        enabled: false,
+        provider: "siliconflow",
+        model: "BAAI/bge-m3",
+        api_key: "",
+    },
+    // AI对话模型设置
+    ai_chat_setting: {
+        provider: "siliconflow",
+        base_url: "https://api.siliconflow.cn/v1",
+        model: "deepseek-ai/DeepSeek-V4-Flash",
+        api_key: "",
+    },
 };
 
 // 公共配置白名单

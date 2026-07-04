@@ -35,6 +35,12 @@ export const menuConfig = [
                 icon: "ri:global-line",
                 route: "/dashboard/site_setting",
             },
+            {
+                id: "ai_setting",
+                titleKey: "dashboard.ai_setting",
+                icon: "ri:robot-2-line",
+                route: "/dashboard/ai_setting",
+            },
         ],
     },
 ];

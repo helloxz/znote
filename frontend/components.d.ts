@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AiSettingPanel: typeof import('./src/components/dashboard/AiSettingPanel.vue')['default']
     CategoryContextMenu: typeof import('./src/components/note/CategoryContextMenu.vue')['default']
     CategoryTree: typeof import('./src/components/note/CategoryTree.vue')['default']
     CategoryTreeNode: typeof import('./src/components/note/CategoryTreeNode.vue')['default']

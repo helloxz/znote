@@ -11,6 +11,7 @@ import UsersPanel from "@/components/dashboard/UsersPanel.vue";
 import TemplatePanel from "@/components/dashboard/TemplatePanel.vue";
 import SystemPanel from "@/components/dashboard/SystemPanel.vue";
 import SiteSettingPanel from "@/components/dashboard/SiteSettingPanel.vue";
+import AiSettingPanel from "@/components/dashboard/AiSettingPanel.vue";
 import { useUserStore } from "@/stores/user";
 import { useSiteStore } from "@/stores/site";
 
@@ -32,6 +33,7 @@ const componentMap: Record<string, any> = {
     templates: TemplatePanel,
     settings: SystemPanel,
     site_setting: SiteSettingPanel,
+    ai_setting: AiSettingPanel,
 };
 
 // 深拷贝菜单配置，使 expanded 属性可响应
