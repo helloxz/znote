@@ -41,6 +41,8 @@ backend/
     └── helper.ts         # 工具函数（密码加密/Token解析）
 ```
 
+> 注意：使用Mastra框架的时候你应该遵循skills的约定，而不是自我猜测它的用法。
+
 ### 前端目录 (`frontend/`)
 
 ```

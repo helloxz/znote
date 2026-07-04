@@ -73,6 +73,9 @@ export const notes = sqliteTable("notes", {
     notebook_id: integer("notebook_id").notNull(),                                  // 所在叶子分类
     title: text("title").notNull(),                                                  // 笔记标题
     content: text("content").default("").notNull(),                                  // Markdown 内容
+    allow_vectorize: integer("allow_vectorize").default(1).notNull(),                  // 是否允许 AI 向量化 0/1
+    is_vectorized: integer("is_vectorized").default(0),                   // 向量化状态 0=待处理 1=已完成 2=跳过(超长) 3=失败
+    vectorized_at: integer("vectorized_at", { mode: "timestamp" }),                    // 向量化完成时间
     is_pinned: integer("is_pinned").default(0).notNull(),                            // 置顶 0/1
     is_deleted: integer("is_deleted").default(0).notNull(),                          // 软删除 0/1
     deleted_at: integer("deleted_at", { mode: "timestamp" }),                        // 删除时间（软删除时写入）
