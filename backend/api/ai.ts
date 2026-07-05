@@ -1,7 +1,7 @@
 import { Context } from "hono";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { desc, eq, and, inArray } from "drizzle-orm";
+import { desc, eq, and, inArray, lte, sql } from "drizzle-orm";
 import { createOpenAI } from "@ai-sdk/openai";
 import { embedMany } from "ai";
 import { RequestContext } from "@mastra/core/request-context";
@@ -166,11 +166,155 @@ export async function vectorizeNextBatch(batchSize = 20) {
 }
 
 /**
+ * 更新已修改笔记的向量数据
+ * 查询已向量化但内容有更新的笔记（updated_at > vectorized_at，且至少 6 分钟前修改，避免正在编辑中），
+ * 重新 embedding 并更新向量库
+ * @param batchSize 每批处理数量，默认 20
+ * @returns 各状态计数 { success, failed }
+ */
+export async function updateVectorizedNotes(batchSize = 20) {
+    // 1. 检查 AI embedding 是否已开启
+    const embeddingConfig = await getAIEmbeddingConfig();
+    if (!embeddingConfig?.enabled) {
+        return { success: 0, failed: 0 };
+    }
+
+    // 2. 查询需要更新的笔记（6 分钟缓冲避免正在编辑的笔记）
+    const sixMinutesAgo = new Date(Date.now() - 6 * 60 * 1000);
+    const notes = await db
+        .select()
+        .from(schema.notes)
+        .where(
+            and(
+                eq(schema.notes.is_deleted, 0),
+                eq(schema.notes.allow_vectorize, 1),
+                eq(schema.notes.is_vectorized, 1),
+                sql`${schema.notes.updated_at} > ${schema.notes.vectorized_at}`,
+                lte(schema.notes.updated_at, sixMinutesAgo),
+            )
+        )
+        .orderBy(desc(schema.notes.id))
+        .limit(batchSize);
+
+    if (notes.length === 0) {
+        return { success: 0, failed: 0 };
+    }
+
+    // 3. 解析每篇笔记的顶层笔记本 ID
+    const userIds = [...new Set(notes.map(n => n.user_id))];
+    const allNotebooks = await db
+        .select({
+            id: schema.notebooks.id,
+            parent_id: schema.notebooks.parent_id,
+        })
+        .from(schema.notebooks)
+        .where(inArray(schema.notebooks.user_id, userIds));
+
+    const notebookParentMap = new Map<number, number | null>();
+    for (const nb of allNotebooks) {
+        notebookParentMap.set(nb.id, nb.parent_id);
+    }
+
+    const getRootNotebookId = (notebookId: number): number => {
+        const visited = new Set<number>();
+        let current = notebookId;
+        while (true) {
+            if (visited.has(current)) break;
+            visited.add(current);
+            const parentId = notebookParentMap.get(current);
+            if (parentId === null) return current;
+            if (parentId === undefined) return notebookId;
+            current = parentId;
+        }
+        return notebookId;
+    };
+
+    const noteRootMap = new Map<number, number>();
+    for (const note of notes) {
+        noteRootMap.set(note.id, getRootNotebookId(note.notebook_id));
+    }
+
+    // 4. 批量向量化
+    let successIds: number[] = [];
+    let failedIds: number[] = [];
+
+    try {
+        const openai = createOpenAI({
+            baseURL: getBaseURL(embeddingConfig.provider),
+            apiKey: embeddingConfig.api_key,
+        });
+
+        const contents = notes.map(n => n.content);
+        const isBgeModel = embeddingConfig.model.toLowerCase().includes("bge");
+        const { embeddings } = await embedMany({
+            model: openai.embedding(embeddingConfig.model),
+            values: contents,
+            providerOptions: isBgeModel
+                ? undefined
+                : { openai: { dimensions: VECTOR_DIMENSIONS } },
+        });
+
+        // 5. 逐条删除旧向量 + 写入新向量
+        if (embeddings.length > 0) {
+            for (let i = 0; i < notes.length; i++) {
+                const note = notes[i];
+                try {
+                    // 删除该笔记的旧向量
+                    await vectorStore.deleteVectors({
+                        indexName: INDEX_NAME,
+                        filter: { note_id: note.id, user_id: note.user_id },
+                    });
+                } catch { /* 旧向量不存在时忽略 */ }
+
+                // 写入新向量
+                await vectorStore.upsert({
+                    indexName: INDEX_NAME,
+                    vectors: [embeddings[i]],
+                    metadata: [{
+                        note_id: note.id,
+                        user_id: note.user_id,
+                        notebook_id: noteRootMap.get(note.id)!,
+                        title: note.title,
+                    }],
+                });
+            }
+        }
+
+        successIds = notes.map(n => n.id);
+        console.log(`向量更新完成: 成功 ${successIds.length} 条, 失败 ${failedIds.length} 条`);
+    } catch (err) {
+        console.error("向量更新失败:", err);
+        failedIds = notes.map(n => n.id);
+    }
+
+    // 6. 批量更新笔记向量化时间
+    if (successIds.length > 0) {
+        await db
+            .update(schema.notes)
+            .set({ is_vectorized: 1, vectorized_at: new Date() })
+            .where(inArray(schema.notes.id, successIds));
+    }
+
+    if (failedIds.length > 0) {
+        await db
+            .update(schema.notes)
+            .set({ is_vectorized: 3, vectorized_at: new Date() })
+            .where(inArray(schema.notes.id, failedIds));
+    }
+
+    return {
+        success: successIds.length,
+        failed: failedIds.length,
+    };
+}
+
+/**
  * 管理员重置向量化（清空向量库 + 重置所有笔记为待向量化）
  * POST /api/admin/reset_vectorization
  */
 export async function resetVectorization(c: Context) {
-    await vectorStore.truncateIndex({ indexName: INDEX_NAME });
+    await vectorStore.deleteIndex({ indexName: INDEX_NAME });
+    await vectorStore.createIndex({ indexName: INDEX_NAME, dimension: 1024 });
 
     await db.update(schema.notes)
         .set({ is_vectorized: 0, vectorized_at: null })
