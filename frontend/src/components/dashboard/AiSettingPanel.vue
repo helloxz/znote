@@ -1,6 +1,21 @@
 <template>
     <div class="ai-setting p-3 md:p-6">
         <div class="flex flex-col items-center gap-6">
+            <!-- AI功能提示 -->
+            <n-alert type="warning" :show-icon="false" class="w-full max-w-[640px]">
+                <ul class="list-disc pl-4 space-y-1 text-sm">
+                    <li>{{ t("ai_setting.notice.beta") }}</li>
+                    <li>
+                        {{ t("ai_setting.notice.docs") }}
+                        <a href="https://dwz.ovh/mzuo" target="_blank" class="text-blue-500 underline">
+                            {{ t("ai_setting.notice.docs_link") }}
+                        </a>
+                    </li>
+                    <li>{{ t("ai_setting.notice.reset_vector") }}</li>
+                    <li>{{ t("ai_setting.notice.privacy") }}</li>
+                </ul>
+            </n-alert>
+
             <n-card :bordered="false" class="w-full max-w-[640px] rounded-xl shadow-sm">
                 <!-- 向量模型配置 -->
                 <div class="mb-4 text-[18px] font-semibold text-[#222]">{{ t("ai_setting.embedding.title") }}</div>
@@ -136,7 +151,7 @@
 <script lang="ts" setup>
 import { onMounted, reactive, ref } from "vue";
 import type { FormInst, FormRules } from "naive-ui";
-import { NButton, NCard, NDivider, NForm, NFormItem, NInput, NModal, NSelect, NSwitch, useMessage } from "naive-ui";
+import { NAlert, NButton, NCard, NDivider, NForm, NFormItem, NInput, NModal, NSelect, NSwitch, useMessage } from "naive-ui";
 import { useI18n } from "vue-i18n";
 import req from "@/utils/req";
 
