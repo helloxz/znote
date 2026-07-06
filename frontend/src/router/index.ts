@@ -53,6 +53,11 @@ const router = createRouter({
             component: () => import("@/views/ShareView.vue"),
         },
         {
+            path: "/docs",
+            name: "docs",
+            component: () => import("@/views/DocsListView.vue"),
+        },
+        {
             path: "/doc/_ai",
             name: "docAI",
             component: () => import("@/views/DocAIView.vue"),
@@ -89,7 +94,7 @@ const router = createRouter({
 
 router.beforeEach((to) => {
     const publicPaths = ["/", "/user/init", "/user/login", "/user/register"];
-    if (publicPaths.includes(to.path) || to.path.startsWith("/doc/") || to.path.startsWith("/s/")) {
+    if (publicPaths.includes(to.path) || to.path.startsWith("/docs") || to.path.startsWith("/doc/") || to.path.startsWith("/s/")) {
         return true;
     }
 

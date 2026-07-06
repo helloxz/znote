@@ -338,6 +338,37 @@ export const deleteDoc = async (c: Context) => {
 // ==================== 公开 API ====================
 
 /**
+ * 获取所有公开文档列表（访客专用）
+ * 仅返回 status=active 的文档，按 id 倒序排列
+ */
+export const listPublicDocs = async (c: Context) => {
+    const rows = await db
+        .select({
+            id: schema.docs.id,
+            notebook_id: schema.docs.notebook_id,
+            slug: schema.docs.slug,
+            title: schema.docs.title,
+            description: schema.docs.description,
+            keywords: schema.docs.keywords,
+            created_at: schema.docs.created_at,
+            updated_at: schema.docs.updated_at,
+            notebook_title: schema.notebooks.title,
+            notebook_description: schema.notebooks.description,
+        })
+        .from(schema.docs)
+        .leftJoin(schema.notebooks, eq(schema.docs.notebook_id, schema.notebooks.id))
+        .where(eq(schema.docs.status, "active"))
+        .orderBy(desc(schema.docs.id))
+        .all();
+
+    return c.json({
+        code: 200,
+        msg: "doc.public.list.success",
+        data: rows,
+    });
+};
+
+/**
  * 获取公开文档结构（分类树 + 笔记列表，不含 content）
  * 校验 doc 存在且 status=active，收集子树分类 ID，
  * 构建带 type 标记的树结构供前端渲染左侧导航
