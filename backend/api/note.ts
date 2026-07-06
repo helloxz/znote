@@ -365,15 +365,13 @@ export const sortNotes = async (c: Context) => {
 
     const notebookId = firstNote.notebook_id;
 
-    // 事务内批量更新 sort_order（带 user_id 防越权）
-    const now = new Date();
+    // 事务内批量更新 sort_order（带 user_id 防越权，不更新 updated_at）
     await db.transaction(async (tx) => {
         for (const item of items) {
             await tx
                 .update(schema.notes)
                 .set({
                     sort_order: item.sort_order,
-                    updated_at: now,
                 })
                 .where(and(
                     eq(schema.notes.id, item.id),
