@@ -192,7 +192,21 @@ const copyMarkdown = async () => {
       <!-- Markdown 内容渲染 -->
       <div ref="contentRef" class="doc-content" @click="handleContentClick">
         <ThemeProvider :theme="codeTheme">
-          <IncremarkContent :content="note.content" :is-finished="true" />
+          <IncremarkContent
+            :content="note.content"
+            :is-finished="true"
+            :incremark-options="{
+                htmlTree: {
+                    tagBlacklist: [
+                        'script', 'style', 'object', 'embed',
+                        'form', 'input', 'button', 'textarea',
+                        'select', 'meta', 'link', 'base',
+                        'frame', 'frameset', 'applet',
+                        'noscript', 'template'
+                    ]
+                }
+            }"
+          />
         </ThemeProvider>
       </div>
     </template>
