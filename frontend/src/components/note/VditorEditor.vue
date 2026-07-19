@@ -56,7 +56,7 @@ onMounted(() => {
 
     vditor = new Vditor(editorRef.value, {
         height: "100%",
-        mode: "ir",
+        mode: "wysiwyg",
         theme: "classic",
         lang: "zh_CN",
         icon: "ant",
@@ -66,6 +66,9 @@ onMounted(() => {
         value: props.modelValue,
         toolbarConfig: { pin: true },
         ...(isMobile ? { toolbar: ["headings", "bold", "list", "check", "upload"] } : {}),
+        customWysiwygToolbar(_type: string, _popover: HTMLElement) {
+            // Vditor 3.11.2 要求在 options 中提供此回调，否则内部调用报错
+        },
         cache: { enable: false },
         counter: { enable: true, type: "text" },
         outline: { enable: false, position: "left" },
