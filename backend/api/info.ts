@@ -5,7 +5,7 @@ import * as schema from "@/db/schema";
 import { getAppName } from "@/utils/helper";
 
 export const APP_VERSION = "0.4.7";
-export const APP_DATE = "2026081701";
+export const APP_DATE = "2026081702";
 
 export const getAppInfo = async (c: Context) => {
     const userCount = await db.select({ count: count() }).from(schema.users);
