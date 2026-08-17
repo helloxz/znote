@@ -535,3 +535,188 @@ export const getPublicNote = async (c: Context) => {
         },
     });
 };
+
+/**
+ * 沿 parent_id 向上查找顶层笔记本 ID
+ * 笔记始终挂在叶子分类上，需回溯到根才能匹配 docs.notebook_id
+ * @param startId 起始分类 ID（笔记的 notebook_id）
+ * @returns 顶层笔记本 ID；分类链断裂或异常返回 null
+ */
+const findTopNotebookId = async (startId: number): Promise<number | null> => {
+    let id: number | null = startId;
+    let depth = 0;
+    while (id !== null) {
+        const nb = await db
+            .select({ id: schema.notebooks.id, parent_id: schema.notebooks.parent_id })
+            .from(schema.notebooks)
+            .where(eq(schema.notebooks.id, id))
+            .get();
+        if (!nb) return null; // 分类链断裂，视为不可公开
+        if (nb.parent_id === null) return nb.id; // 已到顶层
+        id = nb.parent_id;
+        // 防环保护：正常分类树深度远小于该值
+        if (++depth > 50) return null;
+    }
+    return null;
+};
+
+/**
+ * 输出公开笔记的原始 Markdown 文本（.md 直链）
+ * 路由：GET /note/{id}.md
+ * 校验：笔记未删除，且其所属分类树的顶层笔记本已发布为公开文档（docs.status = active）
+ * 通过则返回 `# 标题\n\n内容`（text/markdown），否则返回 404
+ */
+export const getPublicNoteMd = async (c: Context) => {
+    // param 值为 "123.md" 形式，仅接受数字 id + .md 后缀
+    const raw = c.req.param("id") || "";
+    if (!/^\d+\.md$/.test(raw)) {
+        return c.text("Not Found", 404);
+    }
+    const noteId = Number(raw.slice(0, -3));
+
+    // 查询笔记，校验未删除
+    const note = await db
+        .select()
+        .from(schema.notes)
+        .where(and(
+            eq(schema.notes.id, noteId),
+            eq(schema.notes.is_deleted, 0),
+        ))
+        .get();
+
+    if (!note) {
+        return c.text("Not Found", 404);
+    }
+
+    // 向上找到顶层笔记本，再匹配公开文档
+    const topNotebookId = await findTopNotebookId(note.notebook_id);
+    if (topNotebookId === null) {
+        return c.text("Not Found", 404);
+    }
+
+    const doc = await db
+        .select({ status: schema.docs.status })
+        .from(schema.docs)
+        .where(eq(schema.docs.notebook_id, topNotebookId))
+        .get();
+
+    // 仅公开（active）文档下的笔记才允许输出原文
+    if (!doc || doc.status !== "active") {
+        return c.text("Not Found", 404);
+    }
+
+    // 输出原始标题 + Markdown 内容（与前端"复制 Markdown"格式一致：一级标题 + 空行 + 内容）
+    return c.text(`# ${note.title}\n\n${note.content}`, 200, {
+        "Content-Type": "text/markdown; charset=utf-8",
+    });
+};
+
+/**
+ * 输出公开文档的 llms.txt（AI 索引文件）
+ * 路由：GET /doc/{slug}/llms.txt
+ * 内容：文档标题 + 描述（blockquote）+ 按分类分组的笔记索引
+ * 链接：完整 URL（当前请求协议 + 域名 + /note/{id}.md）
+ * 分组：深度 1 分类用自身标题，深度 2+ 压成"父/子"（最近两级）
+ * 校验：doc 存在且 status=active，否则 404
+ */
+export const getPublicDocLlmsTxt = async (c: Context) => {
+    const slug = c.req.param("slug") as string;
+
+    // 查找公开文档，校验状态（404 语义）
+    const doc = await db
+        .select()
+        .from(schema.docs)
+        .where(eq(schema.docs.slug, slug))
+        .get();
+
+    if (!doc || doc.status !== "active") {
+        return c.text("Not Found", 404);
+    }
+
+    // 根笔记本标题/描述，作为文档自定义为空时的兜底（与 getPublicDoc 一致）
+    const rootNotebook = await db
+        .select({ title: schema.notebooks.title, description: schema.notebooks.description })
+        .from(schema.notebooks)
+        .where(eq(schema.notebooks.id, doc.notebook_id))
+        .get();
+
+    // 收集子树所有分类 ID
+    const notebookIds = await collectSubtreeIds(doc.notebook_id);
+    const idList = [...notebookIds];
+
+    // 子树内所有分类（按 sort_order 排序，保证小节顺序稳定）
+    const notebooks = await db
+        .select({
+            id: schema.notebooks.id,
+            parent_id: schema.notebooks.parent_id,
+            title: schema.notebooks.title,
+            sort_order: schema.notebooks.sort_order,
+        })
+        .from(schema.notebooks)
+        .where(inArray(schema.notebooks.id, idList))
+        .orderBy(asc(schema.notebooks.sort_order))
+        .all();
+
+    // 子树内所有未删除笔记（排序与 getPublicDoc 一致：置顶 → sort_order → 创建时间）
+    const notes = await db
+        .select({
+            id: schema.notes.id,
+            notebook_id: schema.notes.notebook_id,
+            title: schema.notes.title,
+            is_pinned: schema.notes.is_pinned,
+            sort_order: schema.notes.sort_order,
+            created_at: schema.notes.created_at,
+        })
+        .from(schema.notes)
+        .where(and(
+            inArray(schema.notes.notebook_id, idList),
+            eq(schema.notes.is_deleted, 0),
+        ))
+        .orderBy(desc(schema.notes.is_pinned), asc(schema.notes.sort_order), desc(schema.notes.created_at))
+        .all();
+
+    const notebooksById = new Map(notebooks.map((nb) => [nb.id, nb]));
+
+    // 小节标题：深度 1 用分类自身标题，深度 2+（含更深层级）统一取最近两级"父/子"
+    const sectionTitle = (nb: (typeof notebooks)[number]): string => {
+        if (nb.parent_id === null) return nb.title; // 根分类直接用自身标题
+        const parent = notebooksById.get(nb.parent_id);
+        if (!parent || parent.parent_id === null) return nb.title; // 深度 1
+        return `${parent.title}/${nb.title}`;
+    };
+
+    // 分类 → 笔记列表（保持笔记排序）
+    const grouped = new Map<number, (typeof notes)[number][]>();
+    for (const note of notes) {
+        const list = grouped.get(note.notebook_id) || [];
+        list.push(note);
+        grouped.set(note.notebook_id, list);
+    }
+
+    // Markdown 转义：转义链接特殊字符并压平空白，防止标题/描述破坏索引格式
+    const escapeMd = (s: string) =>
+        s.replace(/[\[\]()]/g, (ch) => `\\${ch}`).replace(/\s+/g, " ").trim();
+
+    // 完整 URL 前缀：直接用当前请求的协议 + 域名
+    const origin = new URL(c.req.url).origin;
+
+    const title = escapeMd(doc.title || rootNotebook?.title || "");
+    const description = escapeMd(doc.description || rootNotebook?.description || "");
+
+    const lines: string[] = [`# ${title}`];
+    if (description) lines.push("", `> ${description}`);
+
+    // 按分类输出小节，无笔记的分类跳过
+    for (const nb of notebooks) {
+        const list = grouped.get(nb.id);
+        if (!list || list.length === 0) continue;
+        lines.push("", `## ${escapeMd(sectionTitle(nb))}`);
+        for (const note of list) {
+            lines.push(`- [${escapeMd(note.title)}](${origin}/note/${note.id}.md)`);
+        }
+    }
+
+    return c.text(lines.join("\n") + "\n", 200, {
+        "Content-Type": "text/plain; charset=utf-8",
+    });
+};

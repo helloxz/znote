@@ -33,7 +33,7 @@ import { exportZip } from "@/api/export";
 import { uploadFiles } from "@/api/file";
 import { searchNotes } from "@/api/search";
 import { chatWithNotes, listThreads, getThread, deleteThread, resetVectorization, guestChat, checkAIStatus } from "@/api/ai";
-import { listDocs, createDoc, updateDoc, deleteDoc, getAllTopLevelNotebooks, getPublicDoc, getPublicNote, listPublicDocs } from "@/api/doc";
+import { listDocs, createDoc, updateDoc, deleteDoc, getAllTopLevelNotebooks, getPublicDoc, getPublicNote, getPublicNoteMd, getPublicDocLlmsTxt, listPublicDocs } from "@/api/doc";
 import { verifyApiToken } from "@/middleware/auth";
 import { docChatRateLimiter } from "@/middleware/rate-limit";
 import type { AppVariables } from "@/types";
@@ -105,6 +105,8 @@ publicRouter.get("/user/*", index);
 publicRouter.get("/app", index);
 publicRouter.get("/app/*", index);
 publicRouter.get("/doc", index);
+// 公开文档 llms.txt（AI 索引）：必须在 /doc/*（SPA fallback）之前注册，否则被通配符拦截
+publicRouter.get("/doc/:slug/llms.txt", getPublicDocLlmsTxt);
 publicRouter.get("/doc/*", index);
 publicRouter.get("/docs", index);
 publicRouter.get("/s", index);
@@ -113,6 +115,8 @@ publicRouter.get("/s/*", index);
 publicRouter.get("/api/doc/:slug", getPublicDoc);
 publicRouter.get("/api/doc/:slug/note/:noteId", getPublicNote);
 publicRouter.get("/api/docs", listPublicDocs);
+// 公开笔记 Markdown 直链：/note/{id}.md，仅公开文档下的笔记返回原文，否则 404
+publicRouter.get("/note/:id", getPublicNoteMd);
 publicRouter.post("/api/doc/chat", docChatRateLimiter, guestChat);
 publicRouter.get("/api/share/:shareId", getShare);
 publicRouter.get("/api/system/status", getSystemStatus);
